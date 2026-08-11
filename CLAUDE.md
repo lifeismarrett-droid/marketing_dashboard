@@ -80,11 +80,25 @@ marketinig_dashboard/
 호출해서 동일한 필터 상태(날짜 범위·학습기간·목표 CPA)를 공유합니다. 사이드바 위젯에 명시적
 `key`(`show_learning`, `target_cpa`, `date_range_filter`)를 줬기 때문에 Streamlit의
 `st.session_state`를 통해 페이지를 이동해도 값이 유지됩니다 — **새 위젯을 추가할 때도 반드시
-`key`를 명시하세요.** 안 그러면 페이지마다 별개 상태로 취급됩니다.
+`key`를 명시하세요.** 안 그러면 페이지마다 별개 상태로 취급됩니다. `render_sidebar()`는 위젯들
+아래에 "필터 적용 범위" 안내 캡션도 함께 렌더링합니다 — 어떤 필터가 어느 데이터에 적용되는지
+사이드바 한 곳에서 항상 볼 수 있게 하기 위함입니다(각 페이지 caption의 개별 안내와 별개로 유지).
 
 새 페이지를 추가할 때: `pages/`에 파일을 만들고 `app.py`의 `st.navigation([...])` 목록에
-`st.Page("pages/파일명.py", title=...)`를 추가하면 됩니다. `st.set_page_config`는 `app.py`
-한 곳에만 있어야 합니다(페이지 파일에서 또 호출하면 에러).
+`st.Page("pages/파일명.py", title=..., icon="이모지")`를 추가하면 됩니다(현재 🎯/📈/💰 — 사이드바
+네비게이션에서 페이지를 한눈에 구분하기 위한 용도이니, 새 페이지도 주제를 잘 나타내는 이모지 하나를
+붙이세요). `st.set_page_config`는 `app.py` 한 곳에만 있어야 합니다(페이지 파일에서 또 호출하면 에러).
+
+**계산 투명성**: 히어로/핵심 지표 옆에는 "구독 신청 66건 ÷ 클릭수 1,186로 계산됩니다" 식으로
+분자·분모를 그대로 캡션에 적어둡니다. 숫자만 보여주고 계산식을 숨기면 신뢰하기 어렵다는 원칙이라,
+새 파생 지표(비율·평균)를 카드로 추가할 때도 같은 패턴을 따르세요.
+
+**표본 크기 경고**: `dc.small_sample_warning(conversions, subject)`는 전환수가
+`dc.SMALL_SAMPLE_THRESHOLD`(기본 10) 미만이면 "표본이 작아 비교 근거가 되지 못한다"는 문구를
+반환합니다(초과 시 `None`). 전체 기간 배너(1·3번 페이지)와 세그먼트별 비교(키워드·기기·시간대)에
+쓰고 있습니다. 새로 세그먼트별 비교(예: 새 광고그룹, 새 캠페인)를 추가할 때도 이 헬퍼로 표본 크기를
+먼저 확인한 뒤 우열을 논하는 문구를 넣으세요 — 특히 `device_hour.csv`는 24개 시간대에 66건이
+흩어져 있어(구간당 최대 7건) 거의 항상 이 경고가 뜹니다.
 
 ## 코딩 컨벤션
 
@@ -113,7 +127,7 @@ marketinig_dashboard/
 
 - **컬럼 정리**: 항상 결측인 컬럼(`예산 소진`, `고객 아님`), 값이 하나뿐인 컬럼(`광고 관련성`·`예상 CTR`·`방문 페이지` — 전부 "평균 이상"), `_pct` float 컬럼과 중복되는 원본 % 문자열 컬럼(`CTR`, `전환율`)을 제거합니다. 원본 CSV에 새 컬럼이 추가되면 이 목록(`DROP_COLS`)에 없으므로 기본적으로 표시됩니다 — 새로 항상-결측/항상-동일 컬럼이 생기면 `DROP_COLS`에 추가하세요.
 - **숫자 포맷**: `NUMBER_FORMATS` 딕셔너리로 통화(`₩{:,.0f}`)·퍼센트(`{:.2f}%`)·정수(`{:,.0f}`)를 컬럼명 기준으로 일괄 적용합니다.
-- **히트맵**: `HEATMAP_HIGH_IS_GOOD`(CTR·전환율·구독신청·품질점수 — 높을수록 좋음 → `RdYlGn`)과 `HEATMAP_LOW_IS_GOOD`(CPA·비용 — 낮을수록 좋음 → `RdYlGn_r`)로 나눠 컬럼별 독립 정규화(`axis=0`) 그라데이션을 입힙니다. matplotlib이 없으면 `Styler.background_gradient()`가 실패하니 `requirements.txt`에서 matplotlib을 빼면 안 됩니다.
+- **히트맵**: `HEATMAP_HIGH_IS_GOOD`(CTR·전환율·구독신청·품질점수 — 높을수록 좋음)과 `HEATMAP_LOW_IS_GOOD`(CPA·비용 — 낮을수록 좋음)로 나눠 컬럼별 독립 정규화(`axis=0`) 그라데이션을 입힙니다. 색은 matplotlib 기본 `RdYlGn`이 아니라 `_HEATMAP_GOOD_HIGH_CMAP`/`_HEATMAP_GOOD_LOW_CMAP`(코랄 ↔ 연회색 ↔ 그린을 직접 배합한 `LinearSegmentedColormap`)을 씁니다 — 기본값은 채도가 높아 표 전체를 덮으면 눈이 피로하고, 반대로 너무 낮추면 칙칙해 보여서 그 중간으로 맞춘 값입니다. 색을 다시 조정할 땐 `dashboard_common.py` 상단의 두 리스트(`["#e2685c", "#f0ede4", "#5cb85c"]`)만 바꾸면 됩니다. matplotlib이 없으면 `Styler.background_gradient()`가 실패하니 `requirements.txt`에서 matplotlib을 빼면 안 됩니다.
 - **목표 CPA 강조**: 그라데이션 위에 `cpa_col` 인자를 넘긴 표만 목표 초과 행을 반투명 빨강으로 한 번 더 덮어씁니다(그라데이션보다 우선순위 높음).
 - 새 표를 추가할 때는 원본 컬럼을 그대로 `dc.style_table(df, target_cpa, has_target, cpa_col=...)`에 넘기면 되고, 표시용 컬럼을 미리 골라낸 경우(예: 검색어 페이지의 후보 표)에도 그대로 통과시키면 됩니다. `target_cpa`/`has_target`은 `dc.render_sidebar()`가 반환한 값을 그대로 전달하세요(더 이상 전역 변수가 아니라 각 페이지가 명시적으로 들고 다닙니다).
 

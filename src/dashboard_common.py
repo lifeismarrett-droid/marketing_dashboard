@@ -9,16 +9,39 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+from matplotlib.colors import LinearSegmentedColormap
 
 from src import data_loader, metrics
 
 # 광고그룹 2개를 모든 차트에서 동일한 색으로 고정 (색맹 안전성 검증된 조합).
 GROUP_COLORS = {"홈트 클래스": "#2a78d6", "홈핏 브랜드": "#eb6834"}
 TARGET_LINE_COLOR = "#d03b3b"
-TARGET_HIGHLIGHT_BG = "rgba(208, 59, 59, 0.22)"
+TARGET_HIGHLIGHT_BG = "rgba(226, 104, 92, 0.35)"
 STATUS_GOOD_COLOR = "#0ca30c"
 STATUS_BAD_COLOR = TARGET_LINE_COLOR
 MUTED_TEXT_COLOR = "#898781"
+
+# 표 히트맵 색상. matplotlib 기본 컬러맵(RdYlGn)은 채도가 너무 높아 표 전체를 덮으면
+# 눈이 피로해지고, 반대로 지나치게 낮추면 칙칙해 보인다 — 그 중간 지점(선명하지만
+# 쨍하지 않은 코랄 ↔ 따뜻한 연회색 ↔ 선명한 그린)을 직접 만든다.
+_HEATMAP_GOOD_HIGH_CMAP = LinearSegmentedColormap.from_list(
+    "balanced_good_high", ["#e2685c", "#f0ede4", "#5cb85c"]
+)
+_HEATMAP_GOOD_LOW_CMAP = _HEATMAP_GOOD_HIGH_CMAP.reversed()
+
+# 세그먼트(키워드·기기·시간대 등)를 비교할 때, 전환수가 이 값 미만이면 "표본이 작다"고
+# 판단한다. 업계 통상 관례(비율 비교에 최소 10건 안팎)를 따른 임의 기준이며 정답은 아니다.
+SMALL_SAMPLE_THRESHOLD = 10
+
+
+def small_sample_warning(conversions: float, subject: str) -> str | None:
+    """전환수가 SMALL_SAMPLE_THRESHOLD 미만이면 표본 크기 주의 문구, 아니면 None."""
+    if pd.isna(conversions) or conversions >= SMALL_SAMPLE_THRESHOLD:
+        return None
+    return (
+        f"{subject}의 전환은 {conversions:,.0f}건으로 표본이 작습니다. "
+        "이 정도 건수로는 다른 구간과의 우열 비교가 통계적으로 큰 의미를 갖기 어려우니 참고용으로만 보세요."
+    )
 
 # 표에서 항상 비어 있거나(예산 소진, 고객 아님) 값이 하나뿐이라(광고 관련성 등)
 # "한눈에 파악"에 도움이 안 되는 컬럼, 그리고 _pct 컬럼과 중복되는 원본 % 문자열 컬럼.
@@ -116,6 +139,14 @@ def render_sidebar() -> tuple[bool, int, bool]:
                 f"(참고: 전체 기간 평균 CPA ≈ ₩{default_target:,})"
             ),
         )
+
+        st.markdown("---")
+        st.caption(
+            "**필터 적용 범위**\n\n"
+            "· 기간·학습기간 → 일별/주별/요일별 추이에만 적용\n\n"
+            "· 키워드·검색어·기기/시간대·광고그룹 표는 항상 전체 기간 기준\n\n"
+            "원본 리포트에 날짜별 세부 데이터가 없어 두 종류의 표가 서로 다른 범위를 갖습니다."
+        )
     return show_learning, target_cpa, target_cpa > 0
 
 
@@ -212,9 +243,9 @@ def style_table(df: pd.DataFrame, target_cpa: int = 0, has_target: bool = False,
     high_is_good = [c for c in HEATMAP_HIGH_IS_GOOD if c in tidy.columns]
     low_is_good = [c for c in HEATMAP_LOW_IS_GOOD if c in tidy.columns]
     if high_is_good:
-        styler = styler.background_gradient(subset=high_is_good, cmap="RdYlGn", axis=0)
+        styler = styler.background_gradient(subset=high_is_good, cmap=_HEATMAP_GOOD_HIGH_CMAP, axis=0)
     if low_is_good:
-        styler = styler.background_gradient(subset=low_is_good, cmap="RdYlGn_r", axis=0)
+        styler = styler.background_gradient(subset=low_is_good, cmap=_HEATMAP_GOOD_LOW_CMAP, axis=0)
 
     if cpa_col and cpa_col in tidy.columns:
 

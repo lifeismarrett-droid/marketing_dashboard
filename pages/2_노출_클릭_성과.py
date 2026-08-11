@@ -25,6 +25,7 @@ with st.container(border=True):
     dc.show_metric(f2, "CTR", f"{ctx.ctr:.2f}%", ctx.ctr, ctx.prev_ctr)
     dc.show_arrow(a2)
     dc.show_metric(f3, "클릭수", f"{ctx.clicks:,.0f}", ctx.clicks, ctx.prev_clicks)
+    st.caption(f"CTR = 클릭수 {ctx.clicks:,.0f} ÷ 노출수 {ctx.impr:,.0f}로 계산됩니다")
 
 st.subheader("지표 추이")
 trend_metrics = [("노출수", "노출수"), ("CTR", "CTR_pct"), ("클릭수", "클릭수")]
@@ -63,6 +64,15 @@ with col_hour:
     )
     st.plotly_chart(fig_hour, width="stretch")
 st.caption("기기/시간대별 값은 기여(attribution) 모델에 따라 분배되어 소수일 수 있습니다.")
+
+min_device_conv = device_df["구독 신청"].min()
+min_hour_conv = hour_df["구독 신청"].min()
+if pd.notna(min_hour_conv) and min_hour_conv < dc.SMALL_SAMPLE_THRESHOLD:
+    st.warning(
+        f"시간대별 전환은 구간당 최대 {hour_df['구독 신청'].max():,.1f}건으로 24개 구간에 잘게 나뉘어 있고, "
+        f"기기별로도 가장 적은 구간은 {min_device_conv:,.0f}건입니다. "
+        "시간대·기기 간 CPA·전환율 비교는 참고용으로만 보고, 입찰 조정 같은 결정은 더 긴 기간을 모아본 뒤 내리는 걸 권합니다."
+    )
 
 st.divider()
 st.subheader("실검색어 리포트")

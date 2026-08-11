@@ -27,6 +27,10 @@ cpa_change = metrics.pct_change(ctx.cpa, ctx.prev_cpa)
 if cpa_change is not None and cpa_change >= 15:
     alerts.append(("warning", f"CPA가 이전 기간 대비 {cpa_change:+.0f}% 상승했습니다."))
 
+sample_note = dc.small_sample_warning(ctx.conv, "선택한 기간")
+if sample_note:
+    alerts.append(("warning", sample_note))
+
 if alerts:
     for level, msg in alerts:
         getattr(st, level)(msg)
@@ -57,6 +61,9 @@ with st.container(border=True):
           <div style="font-size:15px; color:{dc.MUTED_TEXT_COLOR}; letter-spacing:0.02em;">핵심 지표 · 전환율</div>
           <div style="font-size:68px; font-weight:800; line-height:1.15; margin:2px 0;">{ctx.convrate:.2f}%</div>
           {hero_delta_html}
+          <div style="font-size:13px; color:{dc.MUTED_TEXT_COLOR}; margin-top:6px;">
+            구독 신청 {ctx.conv:,.0f}건 ÷ 클릭수 {ctx.clicks:,.0f}로 계산됩니다
+          </div>
         </div>
         """,
         unsafe_allow_html=True,

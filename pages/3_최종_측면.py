@@ -22,6 +22,10 @@ cpa_change = metrics.pct_change(ctx.cpa, ctx.prev_cpa)
 if cpa_change is not None and cpa_change >= 15:
     alerts.append(("warning", f"CPA가 이전 기간 대비 {cpa_change:+.0f}% 상승했습니다."))
 
+sample_note = dc.small_sample_warning(ctx.conv, "선택한 기간")
+if sample_note:
+    alerts.append(("warning", sample_note))
+
 if alerts:
     for level, msg in alerts:
         getattr(st, level)(msg)
@@ -54,6 +58,7 @@ with st.container(border=True):
             g3.markdown(f":red[목표 ₩{target_cpa:,.0f} 대비 {target_diff:+.1f}% 초과]")
         else:
             g3.markdown(f":green[목표 ₩{target_cpa:,.0f} 대비 {target_diff:+.1f}%]")
+    st.caption(f"CPA = 비용 ₩{ctx.cost:,.0f} ÷ 구독 신청 {ctx.conv:,.0f}건으로 계산됩니다")
 
 st.subheader("지표 추이")
 trend_metrics = [("비용", "비용"), ("구독 신청", "구독 신청"), ("CPA (전환당비용)", "전환당비용")]
@@ -104,6 +109,14 @@ if has_target:
     fig_qs.add_hline(y=target_cpa, line_dash="dash", line_color=dc.TARGET_LINE_COLOR, annotation_text="목표 CPA")
 st.plotly_chart(fig_qs, width="stretch")
 st.caption("점 크기 = 비용. 품질평가점수는 낮고 CPA는 높은 키워드가 개선 우선순위입니다.")
+
+low_conv_keywords = keywords[keywords["구독 신청"] < dc.SMALL_SAMPLE_THRESHOLD]
+if not low_conv_keywords.empty:
+    detail = ", ".join(f"{r['키워드']} {r['구독 신청']:,.0f}건" for _, r in low_conv_keywords.iterrows())
+    st.warning(
+        f"전체 {len(keywords)}개 키워드 중 {len(low_conv_keywords)}개는 전환이 {dc.SMALL_SAMPLE_THRESHOLD}건 미만입니다 ({detail}). "
+        "이 키워드들의 CPA·CTR 차이는 우열 비교의 근거로 삼기 어려우니 참고용으로만 보세요."
+    )
 
 sort_map = {"비용": "비용", "구독 신청": "구독 신청", "CTR (%)": "CTR_pct", "CPA": "CPA"}
 sort_label = st.selectbox("정렬 기준", list(sort_map.keys()))
